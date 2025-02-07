@@ -1,3 +1,5 @@
+[![Compile and run tests](https://github.com/alessandrocandolini/llm-tests/actions/workflows/ci.yml/badge.svg)](https://github.com/alessandrocandolini/llm-tests/actions/workflows/ci.yml)
+
 # llm-tests
 
 ## How to build and run locally
@@ -42,7 +44,10 @@ To **install** the executable under `~/.local/bin`,
 ```
 stack install
 ```
-and the executable can be run with `llm-tests` assuming `~/.local/bin` is in the `$PATH` variable.
+and the executable can be run with `llm-tests` assuming `~/.local/bin` is in the `$PATH` variable. For instance, 
+```
+llm-tests run -e bouncing-balls -m o3-high
+```
 
 To run a version of **ghci** compatible with the resolver
 ```
