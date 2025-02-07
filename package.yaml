@@ -18,6 +18,8 @@ dependencies:
 - ansi-terminal
 - envparse
 - neat-interpolation
+- gloss
+- random
 
 default-extensions:
 - OverloadedStrings
