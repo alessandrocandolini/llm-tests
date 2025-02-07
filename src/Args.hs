@@ -5,7 +5,7 @@ import Options.Applicative
 data Args = Args Flags Command deriving (Eq, Show)
 
 data Exercise = BouncingBalls deriving (Eq, Show)
-data Model = O3High deriving (Eq, Show)
+data Model = O3High | DSR1 deriving (Eq, Show)
 
 data Command
   = Run Exercise Model
@@ -32,6 +32,7 @@ flags = Flags <$> verbosity
 parseModel :: ReadM Model
 parseModel = eitherReader $ \arg -> case arg of
   "o3-high" -> Right O3High
+  "r1" -> Right DSR1
   _ -> Left $ "Invalid model: " ++ arg
 
 parseExercise :: ReadM Exercise
