@@ -2,7 +2,8 @@
 module OpenAiO3High where
 
 import Graphics.Gloss
-import Graphics.Gloss.Interface.Pure.Game
+import Graphics.Gloss.Interface.IO.Game
+import System.Exit (exitSuccess)
 import System.Random
 
 -- A ball is represented by its position, velocity, radius, mass and colour.
@@ -48,10 +49,8 @@ updateWorld dt balls =
 updateBall :: Float -> Ball -> Ball
 updateBall dt ball@Ball{..} =
   let (vx, vy) = vel
-      -- Update vertical velocity with gravity.
       vy' = vy + gravity * dt
       vx' = vx
-      -- Apply friction to the velocity.
       vx'' = vx' * frictionCoeff
       vy'' = vy' * frictionCoeff
       (x, y) = pos
@@ -77,7 +76,6 @@ handleWallCollision ball@Ball{..} =
 -- COLLISION DETECTION AND RESPONSE BETWEEN BALLS
 ----------------------------------------------------------------------
 
--- | Determine whether two balls are colliding.
 colliding :: Ball -> Ball -> Bool
 colliding b1 b2 =
   let (x1, y1) = pos b1
@@ -87,9 +85,6 @@ colliding b1 b2 =
       distance = sqrt (dx * dx + dy * dy)
   in distance < (radius b1 + radius b2)
 
--- | Resolve the collision between two balls. The collision is handled using
--- a simple elastic collision formula that takes mass into account. In addition,
--- if the balls overlap the programme adjusts their positions so they separate.
 resolveCollision :: Ball -> Ball -> (Ball, Ball)
 resolveCollision b1 b2
   | not (colliding b1 b2) = (b1, b2)
@@ -99,16 +94,14 @@ resolveCollision b1 b2
           dx = x1 - x2
           dy = y1 - y2
           d = sqrt (dx * dx + dy * dy)
-          -- Normal vector from ball2 to ball1.
           nx = dx / d
           ny = dy / d
           (vx1, vy1) = vel b1
           (vx2, vy2) = vel b2
-          -- Project the velocities on the normal direction.
           a1 = vx1 * nx + vy1 * ny
           a2 = vx2 * nx + vy2 * ny
       in if a1 - a2 >= 0
-         then (b1, b2)  -- The balls are moving apart.
+         then (b1, b2)
          else let m1 = mass b1
                   m2 = mass b2
                   optimizedP = (2 * (a1 - a2)) / (m1 + m2)
@@ -116,7 +109,6 @@ resolveCollision b1 b2
                   vy1' = vy1 - optimizedP * m2 * ny
                   vx2' = vx2 + optimizedP * m1 * nx
                   vy2' = vy2 + optimizedP * m1 * ny
-                  -- Separate overlapping balls.
                   overlap = (radius b1 + radius b2 - d) / 2
                   x1' = x1 + nx * overlap
                   y1' = y1 + ny * overlap
@@ -126,7 +118,6 @@ resolveCollision b1 b2
                  , b2 { pos = (x2', y2'), vel = (vx2', vy2') }
                  )
 
--- | Process all pairs of balls to resolve collisions.
 resolveCollisions :: [Ball] -> [Ball]
 resolveCollisions balls = foldl resolvePair balls pairs
   where
@@ -139,7 +130,6 @@ resolveCollisions balls = foldl resolvePair balls pairs
           bs' = updateList i b1' bs
       in updateList j b2' bs'
 
--- | A helper function to update the nth element of a list.
 updateList :: Int -> a -> [a] -> [a]
 updateList i x xs = take i xs ++ [x] ++ drop (i + 1) xs
 
@@ -147,15 +137,12 @@ updateList i x xs = take i xs ++ [x] ++ drop (i + 1) xs
 -- DRAWING FUNCTIONS
 ----------------------------------------------------------------------
 
--- | Draw the world consisting of the box and all the balls.
 drawWorld :: [Ball] -> Picture
 drawWorld balls = Pictures (drawBox : map drawBall balls)
 
--- | Draw the outline of the box.
 drawBox :: Picture
 drawBox = Color white $ Line [(xMin, yMin), (xMax, yMin), (xMax, yMax), (xMin, yMax), (xMin, yMin)]
 
--- | Draw a single ball.
 drawBall :: Ball -> Picture
 drawBall Ball{..} =
   let (x, y) = pos
@@ -165,7 +152,6 @@ drawBall Ball{..} =
 -- BALL GENERATION
 ----------------------------------------------------------------------
 
--- | Generate a list of random balls. The number of balls is configurable.
 generateBalls :: Int -> StdGen -> [Ball]
 generateBalls n gen =
   let (genX, gen1) = split gen
@@ -187,16 +173,24 @@ generateBalls n gen =
             , vel = (vx, vy)
             , radius = r
             , mass = r * r
-            , ballColour = makeColor c1 c2 cs3' 1
+            , ballColour = makeColor c1 c2 cs3 1
             }
-     | (x, y, vx, vy, r, c1, c2, cs3') <- zip8 xs ys vxs vys rs cs1 cs2 cs3
+     | (x, y, vx, vy, r, c1, c2, cs3) <- zip8 xs ys vxs vys rs cs1 cs2 cs3
      ]
 
--- | A helper function to zip eight lists together.
 zip8 :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [g] -> [h] -> [(a, b, c, d, e, f, g, h)]
 zip8 (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs) (g:gs) (h:hs) =
   (a, b, c, d, e, f, g, h) : zip8 as bs cs ds es fs gs hs
 zip8 _ _ _ _ _ _ _ _ = []
+
+----------------------------------------------------------------------
+-- EVENT HANDLING
+----------------------------------------------------------------------
+
+-- Using playIO allows us to perform IO actions in the event handler.
+handleEvent :: Event -> [Ball] -> IO [Ball]
+handleEvent (EventKey (SpecialKey KeyEsc) Down _ _) _ = exitSuccess
+handleEvent _ world = return world
 
 ----------------------------------------------------------------------
 -- MAIN
@@ -204,17 +198,13 @@ zip8 _ _ _ _ _ _ _ _ = []
 
 main :: IO ()
 main = do
-  let numBalls = 10  -- Change this value to have more or fewer balls.
+  let numBalls = 10  -- Change this value for a different number of balls.
   gen <- newStdGen
   let balls = generateBalls numBalls gen
-  play (InWindow "Bouncing Balls" (round boxWidth, round boxHeight) (100, 100))
-       black         -- Background colour.
-       60            -- Number of simulation steps per second.
-       balls         -- Initial world (list of balls).
-       drawWorld     -- Drawing function.
-       handleEvent   -- Event handling (none in this simulation).
-       updateWorld   -- Update function.
-
--- | No event handling is needed for this simulation.
-handleEvent :: Event -> [Ball] -> [Ball]
-handleEvent _ world = world
+  playIO (InWindow "Bouncing Balls" (round boxWidth, round boxHeight) (100, 100))
+         black                           -- Background colour.
+         60                              -- Simulation steps per second.
+         balls                           -- Initial world.
+         (return . drawWorld)            -- Drawing function.
+         handleEvent                     -- Event handling.
+         (\dt world -> return (updateWorld dt world))  -- Update function.
